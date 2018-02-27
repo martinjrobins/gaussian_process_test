@@ -74,4 +74,36 @@ plt.show()
 x0 = np.array(true_theta * 10)
 res = opt.minimize(neg_marginal_log_likelihood, x0,
                    jac=True, options={'disp': True})
-print(res)
+fitted_theta = res.x
+print('found parameters = ' + str(fitted_theta))
+
+K = fitted_theta[0]**2 * np.exp(
+    -(xi - xj)**2 / (2.0 * fitted_theta[1]**2)) + fitted_theta[2]**2 * np.identity(N)
+
+# points we're going to make predictions at.
+xs = np.linspace(-5, 5, 100)
+xi, xj = np.meshgrid(xs, x)
+Ks = fitted_theta[0]**2 * np.exp(
+    -(xi - xj)**2 / (2.0 * fitted_theta[1]**2))
+xi, xj = np.meshgrid(xs, xs)
+Kss = fitted_theta[0]**2 * np.exp(
+    -(xi - xj)**2 / (2.0 * fitted_theta[1]**2))
+
+
+# compute the mean at our test points.
+L = np.linalg.cholesky(K)
+print Ks.shape
+Lk = np.linalg.solve(L, Ks)
+mu = np.dot(Lk.T, np.linalg.solve(L, y))
+
+# compute the variance at our test points.
+s2 = np.diag(Kss) - np.sum(Lk**2, axis=0)
+s = np.sqrt(s2)
+
+
+# PLOTS:
+plt.clf()
+plt.plot(x, y, 'r+', ms=20)
+plt.gca().fill_between(xs.flat, mu - 3 * s, mu + 3 * s, color="#dddddd")
+plt.plot(xs, mu, 'r--', lw=2)
+plt.show()
