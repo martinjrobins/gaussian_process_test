@@ -1,10 +1,13 @@
+from __future__ import print_function
 import pints
 import pints.toy
 import numpy as np
 import pyDOE
 import cma
 import matplotlib.pylab as plt
-from time import process_time
+import time
+import sys
+sys.path.append("build")
 import gptest
 
 # define the kernel and log likelihood
@@ -53,7 +56,7 @@ def fit_and_test_gp(N, dense=True):
     x0 = 0.5 * np.ones(len(upper))
     sigma = 0.9
     options = cma.CMAOptions()
-    options.set('bounds', [[0 for x in lower], [1.0 for y in upper]])
+    #options.set('bounds', [[0 for x in lower], [1.0 for y in upper]])
     # options.set('transformation',[lambda x: x**2+1.2, None])
 
     if dense:
@@ -76,9 +79,9 @@ def fit_and_test_gp(N, dense=True):
             return mll[0, 0]
 
         es = cma.CMAEvolutionStrategy(x0, sigma, options)
-        t1 = process_time()
+        t1 = time.clock()
         es.optimize(neg_marginal_log_likelihood)
-        t2 = process_time()
+        t2 = time.clock()
         es.result_pretty()
         theta = es.result.xbest * (upper - lower) + lower
         time_per_mll = (t2 - t1) / es.result.evaluations
@@ -127,9 +130,9 @@ def fit_and_test_gp(N, dense=True):
             return gpt.calculate_neg_mll()
 
         es = cma.CMAEvolutionStrategy(x0, sigma, options)
-        t1 = process_time()
+        t1 = time.clock()
         es.optimize(neg_marginal_log_likelihood)
-        t2 = process_time()
+        t2 = time.clock()
         es.result_pretty()
         theta = es.result.xbest * (upper - lower) + lower
         time_per_mll = (t2 - t1) / es.result.evaluations
@@ -161,7 +164,11 @@ def fit_and_test_gp(N, dense=True):
 
 
 plt.figure()
-Ns = np.logspace(np.log10(10), np.log10(500), 10)
-error = [fit_and_test_gp(int(N)) for N in Ns]
-plt.loglog(Ns, error)
-plt.show()
+
+if False:
+    Ns = np.logspace(np.log10(10), np.log10(500), 10)
+    error = [fit_and_test_gp(int(N)) for N in Ns]
+    plt.loglog(Ns, error)
+    plt.show()
+else:
+    fit_and_test_gp(100, dense=False)
