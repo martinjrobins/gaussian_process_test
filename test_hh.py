@@ -120,11 +120,11 @@ def fit_and_test_gp(N, dense=True):
         plt.plot(times, mu, 'r--', lw=2)
         plt.savefig('dense_fit_%d.pdf' % N)
     else:
-        gpt = gptest.GaussianProcessTest(x)
+        gpt = gptest.GaussianProcessTest(x, y)
 
         def neg_marginal_log_likelihood(theta):
             gpt.set_theta(theta)
-            return gpt.calculate_mll()
+            return gpt.calculate_neg_mll()
 
         es = cma.CMAEvolutionStrategy(x0, sigma, options)
         t1 = process_time()
@@ -137,7 +137,7 @@ def fit_and_test_gp(N, dense=True):
 
         # predict using test points
         gpt.set_theta(es.result.xbest)
-        mu = gpt.calculate_mu_at(xt)
+        mu = gpt.predict_at(xt)
         error = np.sqrt(np.sum((mu - yt)**2) / np.sum(yt**2))
         print('heirarchical N = ' + str(len(y)) + ' and error = ' + str(error))
 
@@ -149,13 +149,11 @@ def fit_and_test_gp(N, dense=True):
             xs[i, 0:len(x0)] = x0
             xs[i, -1] = t
 
-        mu = gpt.calculate_mu_at(xs)
+        mu = gpt.predict_at(xs)
         print(np.sqrt(np.sum((mu - values)**2) / len(values)))
-        s = gpt.calculate_s_at(xs)
 
         plt.clf()
         plt.plot(times, values)
-        plt.gca().fill_between(times, mu - 3 * s, mu + 3 * s, color="#dddddd")
         plt.plot(times, mu, 'r--', lw=2)
         plt.savefig('dense_fit_%d.pdf' % N)
 
