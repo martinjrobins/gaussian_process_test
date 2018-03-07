@@ -126,7 +126,8 @@ def fit_and_test_gp(N, dense=True):
         gpt = gptest.GaussianProcessTest(x, y)
 
         def neg_marginal_log_likelihood(theta):
-            gpt.set_theta(theta)
+            scaled_theta = theta * (upper - lower) + lower
+            gpt.set_theta(scaled_theta)
             return gpt.calculate_neg_mll()
 
         es = cma.CMAEvolutionStrategy(x0, sigma, options)
@@ -171,4 +172,4 @@ if False:
     plt.loglog(Ns, error)
     plt.show()
 else:
-    fit_and_test_gp(100, dense=False)
+    fit_and_test_gp(200, dense=True)

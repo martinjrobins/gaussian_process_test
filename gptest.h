@@ -16,7 +16,8 @@ const double pi = boost::math::constants::pi<double>();
 const size_t D = 3;
 ABORIA_VARIABLE(data, double, "data");
 ABORIA_VARIABLE(weights, double, "weights");
-typedef Particles<std::tuple<data, weights>, D> Particles_t;
+typedef Particles<std::tuple<data, weights>, D, std::vector, Kdtree>
+    Particles_t;
 typedef Particles_t::position position;
 typedef Particles_t::const_reference const_reference;
 
@@ -64,9 +65,14 @@ public:
         if (val > high[d])
           high[d] = val;
       }
+      std::cout << "reading particle at " << get<position>(x)[i] << std::endl;
     }
-    x.init_neighbour_search(low, high + std::numeric_limits<double>::epsilon(),
-                            vbool3::Constant(false));
+    std::cout << "low = " << low << std::endl;
+    std::cout << "hight = " << high << std::endl;
+    x.init_neighbour_search(low,
+                            high + 1e5 * std::numeric_limits<double>::epsilon(),
+                            vbool3::Constant(false), 36);
+    assert(x.size() == N);
     std::cout << "done reading particles from numpy array" << std::endl;
   }
   void set_theta(boost::python::numeric::array theta) {
@@ -77,34 +83,35 @@ public:
     kernel_function.amplitude2 =
         std::pow(boost::python::extract<double>(theta[3]), 2);
     kernel_function.inv_length_scale2 = 0.5 / (length_scale * length_scale);
-    order = 5;
+    order = 6;
+
+    std::cout << "got amplitude = " << std::sqrt(kernel_function.amplitude2)
+              << " lengthscale = " << length_scale << std::endl;
 
     auto kernel = [&](const_reference xi, const_reference xj) {
       return kernel_function(get<position>(xi), get<position>(xj));
     };
 
     auto expansions = make_h2lib_black_box_expansion<D>(order, kernel_function);
-    std::cout << "creating kernel h2 matrix" << std::endl;
     K = std::make_unique<H2LibMatrix>(x, x, expansions, kernel, 1.0);
     K->compress(tol);
-    std::cout << "creating cholesky decomp of h2 matrix" << std::endl;
     solver = std::make_unique<H2LibCholeskyDecomposition>(K->chol(tol));
-    std::cout << "finished" << std::endl;
   }
 
   double calculate_neg_mll() {
-    std::cout << "solving for weights" << std::endl;
     solver->solve(get<data>(x), get<weights>(x));
     const double term1 =
         -0.5 * std::inner_product(get<data>(x).begin(), get<data>(x).end(),
                                   get<weights>(x).begin(), 0);
 
-    std::cout << "calculating log det" << std::endl;
     const double term2 = -0.5 * solver->log_determinant();
 
     const double term3 = -0.5 * x.size() * std::log(2 * pi);
+    std::cout << "term1 = " << term1 << " term2 = " << term2
+              << " term3 = " << term3 << std::endl;
 
-    return -(term1 + term2 + term3);
+    return std::isnan(term2) ? 1e-3 * std::numeric_limits<double>::max()
+                             : -(term1 + term2 + term3);
   }
 
   boost::python::numeric::array
