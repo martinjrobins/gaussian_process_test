@@ -13,27 +13,27 @@ using namespace Aboria;
 
 const double pi = boost::math::constants::pi<double>();
 
-const size_t D = 3;
 ABORIA_VARIABLE(data, double, "data");
 ABORIA_VARIABLE(weights, double, "weights");
-typedef Particles<std::tuple<data, weights>, D, std::vector, Kdtree>
-    Particles_t;
-typedef Particles_t::position position;
-typedef Particles_t::const_reference const_reference;
 
-struct Kernel {
+template <size_t D> struct Kernel {
   double amplitude2;
   vdouble3 inv_length_scale2;
-  double operator()(const vdouble3 &xi, const vdouble3 &xj) const {
-    const vdouble3 dx = xi - xj;
+  double operator()(const auto &xi, const auto &xj) const {
+    const auto dx = xi - xj;
     const double result =
         amplitude2 * std::exp(-(dx * inv_length_scale2).dot(dx));
     return result;
   }
 };
 
-class GaussianProcessTest {
+template <size_t D> class GaussianProcessTest {
 public:
+  typedef Particles<std::tuple<data, weights>, D, std::vector, Kdtree>
+      Particles_t;
+  typedef Particles_t::position position;
+  typedef Particles_t::const_reference const_reference;
+
   GaussianProcessTest(boost::python::numeric::array points,
                       boost::python::numeric::array data_array) {
 
@@ -159,11 +159,11 @@ public:
   }
 
 private:
-  Kernel kernel_function;
+  Kernel<D> kernel_function;
   Particles_t x;
   Particles_t y;
   double amplitude2;
-  vdouble3 inv_length_scale2;
+  double_d inv_length_scale2;
   unsigned int order;
   double tol;
   std::unique_ptr<H2LibMatrix> K;

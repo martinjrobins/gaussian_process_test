@@ -4,24 +4,33 @@ from matplotlib import ticker
 
 gaussian_matrix_solve_solve_time = np.loadtxt('gaussian_matrix_solve_solve_time.txt', skiprows=1)
 gaussian_matrix_solve_setup_time = np.loadtxt('gaussian_matrix_solve_setup_time.txt', skiprows=1)
+gaussian_matrix_solve_iterations = np.loadtxt('gaussian_matrix_solve_iterations.txt', skiprows=1)
 
 matern_matrix_solve_solve_time = np.loadtxt('matern_matrix_solve_solve_time.txt', skiprows=1)
 matern_matrix_solve_setup_time = np.loadtxt('matern_matrix_solve_setup_time.txt', skiprows=1)
+matern_matrix_solve_iterations = np.loadtxt('matern_matrix_solve_iterations.txt', skiprows=1)
 
 exp_matrix_solve_solve_time = np.loadtxt('exp_matrix_solve_solve_time.txt', skiprows=1)
 exp_matrix_solve_setup_time = np.loadtxt('exp_matrix_solve_setup_time.txt', skiprows=1)
+exp_matrix_solve_iterations = np.loadtxt('exp_matrix_solve_iterations.txt', skiprows=1)
+
+gaussian_matrix_solve_test_error = np.loadtxt('gaussian_matrix_solve_test_error.txt', skiprows=1)
+matern_matrix_solve_test_error = np.loadtxt('matern_matrix_solve_test_error.txt', skiprows=1)
+exp_matrix_solve_test_error = np.loadtxt('exp_matrix_solve_test_error.txt', skiprows=1)
+
 
 # tensor (N, sigma, dim, nbucket,precon)
 N = np.array([1000, 2000, 4000, 8000, 16000])
 sigma = np.array([0.1, 0.5, 0.9, 1.3, 1.7])
 dim = np.array([1, 2, 3, 4, 5, 8, 10, 14])
 nbucket = np.array([50, 150, 250, 350])
-precon = ['no precon', 'swartz', 'nystrom']
+precon = ['no precon', 'swartz', 'nystrom', 'chol']
 
 
 def convert_to_tensor(data):
     print('converting to tensor')
     tensor = np.zeros((len(N), len(sigma), len(dim), len(nbucket), len(precon)))
+    tensor[:] = np.nan
     for row in data:
         iN = np.where(N == row[0])[0][0]
         isigma = np.where(sigma == row[1])[0][0]
@@ -30,6 +39,7 @@ def convert_to_tensor(data):
         tensor[iN, isigma, idim, inbucket, 0] = row[6]
         tensor[iN, isigma, idim, inbucket, 1] = row[7]
         tensor[iN, isigma, idim, inbucket, 2] = row[8]
+        tensor[iN, isigma, idim, inbucket, 3] = row[5]
     return tensor
 
 
@@ -46,9 +56,32 @@ def convert_to_series(data):
 
 gaussian_matrix_setup_time_tensors = convert_to_tensor(gaussian_matrix_solve_setup_time)
 gaussian_matrix_solve_time_tensors = convert_to_tensor(gaussian_matrix_solve_solve_time)
-gaussian_matrix_setup_time_series = convert_to_series(gaussian_matrix_solve_setup_time)
-gaussian_matrix_solve_time_series = convert_to_series(gaussian_matrix_solve_solve_time)
 gaussian_matrix_solve_total_time = gaussian_matrix_setup_time_tensors + gaussian_matrix_solve_time_tensors
+
+gaussian_matrix_iterations_tensors = convert_to_tensor(gaussian_matrix_solve_iterations)
+gaussian_matrix_solve_total_time[gaussian_matrix_iterations_tensors == 1000] = np.nan
+
+matern_matrix_setup_time_tensors = convert_to_tensor(matern_matrix_solve_setup_time)
+matern_matrix_solve_time_tensors = convert_to_tensor(matern_matrix_solve_solve_time)
+matern_matrix_solve_total_time = matern_matrix_setup_time_tensors + matern_matrix_solve_time_tensors
+
+matern_matrix_iterations_tensors = convert_to_tensor(matern_matrix_solve_iterations)
+matern_matrix_solve_total_time[matern_matrix_iterations_tensors == 1000] = np.nan
+
+exp_matrix_setup_time_tensors = convert_to_tensor(exp_matrix_solve_setup_time)
+exp_matrix_solve_time_tensors = convert_to_tensor(exp_matrix_solve_solve_time)
+exp_matrix_solve_total_time = exp_matrix_setup_time_tensors + exp_matrix_solve_time_tensors
+
+exp_matrix_iterations_tensors = convert_to_tensor(exp_matrix_solve_iterations)
+exp_matrix_solve_total_time[exp_matrix_iterations_tensors == 1000] = np.nan
+
+gaussian_matrix_solve_test_error_tensors = convert_to_tensor(gaussian_matrix_solve_test_error)
+gaussian_matrix_solve_test_error_tensors[gaussian_matrix_iterations_tensors == 1000] = np.nan
+matern_matrix_solve_test_error_tensors = convert_to_tensor(matern_matrix_solve_test_error)
+matern_matrix_solve_test_error_tensors[matern_matrix_iterations_tensors == 1000] = np.nan
+exp_matrix_solve_test_error_tensors = convert_to_tensor(exp_matrix_solve_test_error)
+exp_matrix_solve_test_error_tensors[exp_matrix_iterations_tensors == 1000] = np.nan
+
 
 # total solve time versus N, sigma, dim, on for each nbucket
 for i in range(len(nbucket)):
@@ -162,25 +195,59 @@ names = ['N', 'sigma', 'dim', 'nbucket', 'precon', 'time']
 #    plt.close(fig)
 
 # plot subplots time versus N for sigma, dim, each precon a diff color
-for nb in range(len(nbucket)):
-    print('plotting', nb)
-    fig, axs = plt.subplots(len(sigma), len(dim), sharey=True, sharex=True)
+kernels = ['gaussian', 'matern', 'exponential']
+
+plot_total_time = False
+if plot_total_time:
+    for t, tensor in enumerate([gaussian_matrix_solve_total_time, matern_matrix_solve_total_time, exp_matrix_solve_total_time]):
+        for nb in range(len(nbucket)):
+            print('plotting', nb)
+            fig, axs = plt.subplots(len(sigma), len(dim), sharey=True, sharex=True)
+            for i in range(len(sigma)):
+                for j in range(len(dim)):
+                    row = len(sigma)-1-i
+                    for k in range(len(precon)):
+                        axs[row, j].loglog(N, tensor[:, i, j, nb, k].reshape(-1), label=precon[k])
+                    if row != len(sigma)-1:
+                        axs[row, j].set_xticks([])
+                    if j == 0:
+                        axs[row, j].set_ylabel('s=%.2f' % sigma[i])
+                    if j != 0:
+                        axs[row, j].set_yticks([])
+                    if row == len(sigma)-1:
+                        axs[row, j].set_xlabel('dim=%d' % dim[j])
+            plt.subplots_adjust(wspace=0, hspace=0)
+            fig.legend(precon)
+            # fig.tight_layout()
+            # fig.subplots_adjust(right=0.75)
+            fig.savefig('%s_matrix_solve_total_time_%d.pdf' % (kernels[t], nbucket[nb]))
+            plt.close(fig)
+
+nb = 0
+print('plotting error', nb)
+fig, axs = plt.subplots(1, len(dim), sharey=True, sharex=False)
+for t, tensor in enumerate([gaussian_matrix_solve_test_error_tensors, matern_matrix_solve_test_error_tensors, exp_matrix_solve_test_error_tensors]):
     for i in range(len(sigma)):
         for j in range(len(dim)):
-            row = len(sigma)-1-i
-            for k in range(3):
-                axs[row, j].loglog(N, gaussian_matrix_solve_total_time[:, i, j, nb, k].reshape(-1), label=precon[k])
-            if row != len(sigma)-1:
-                axs[row, j].set_xticks([])
-            if j == 0:
-                axs[row, j].set_ylabel('s=%f' % sigma[i])
-            if j != 0:
-                axs[row, j].set_yticks([])
-            if row == len(sigma)-1:
-                axs[row, j].set_xlabel('dim=%d' % dim[j])
-    plt.subplots_adjust(wspace=0, hspace=0)
-    fig.legend(loc=7)
-    fig.tight_layout()
-    fig.subplots_adjust(right=0.75)
-    fig.savefig('gaussian_matrix_solve_total_time_%d.pdf' % nbucket[nb])
-    plt.close(fig)
+            k = 3  # just chol
+            if i == 0 and j == 0:
+                label = '%s' % (kernels[t])
+            else:
+                label = '_nolegend_'
+            color = plt.rcParams['axes.prop_cycle'].by_key()['color'][t]
+            alpha = 0.3 + 0.7*(sigma[i]-sigma[0])/sigma[-1]
+            axs[j].loglog(N, tensor[:, i, j, nb, k].reshape(-1), color=color, label=label, alpha=alpha)
+for j in range(len(dim)):
+    if j == 0:
+        axs[j].set_ylabel('test error')
+        axs[j].set_xticks([1000, 10000])
+    else:
+        # axs[j].set_yticks([])
+        axs[j].set_xticks([])
+    axs[j].set_xlabel('dim=%d' % dim[j])
+plt.subplots_adjust(wspace=0, hspace=0)
+fig.legend()
+# fig.tight_layout()
+# fig.subplots_adjust(right=0.75)
+fig.savefig('matrix_solve_test_error_%d.pdf' % (nbucket[nb]))
+plt.close(fig)
